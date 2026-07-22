@@ -6,7 +6,8 @@ use std::process::{Child, Command, Stdio};
 use std::ptr;
 use std::thread;
 use std::time::Duration;
-use x11_dl::xlib::{self, Xlib};
+use crate::monitor::get_xlib;
+use x11_dl::xlib;
 
 pub fn check_dependency(cmd: &str) -> bool {
     Command::new("which")
@@ -23,9 +24,9 @@ pub fn check_dependencies() -> (bool, bool) {
 }
 
 pub fn lower_wallpaper_windows() {
-    let xlib = match Xlib::open() {
-        Ok(x) => x,
-        Err(_) => return,
+    let xlib = match get_xlib() {
+        Some(x) => x,
+        None => return,
     };
 
     unsafe {

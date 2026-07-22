@@ -1,6 +1,7 @@
 use gtk::gdk::prelude::*;
 use std::process::Command;
 use std::ptr;
+use std::sync::OnceLock;
 use x11_dl::xlib::{self, Xlib};
 
 #[derive(Clone, Debug)]
@@ -9,10 +10,16 @@ pub struct MonitorInfo {
     pub geometry: String,
 }
 
+static XLIB: OnceLock<Option<Xlib>> = OnceLock::new();
+
+pub fn get_xlib() -> Option<&'static Xlib> {
+    XLIB.get_or_init(|| Xlib::open().ok()).as_ref()
+}
+
 pub fn is_fullscreen_window_active() -> bool {
-    let xlib = match Xlib::open() {
-        Ok(x) => x,
-        Err(_) => return false,
+    let xlib = match get_xlib() {
+        Some(x) => x,
+        None => return false,
     };
 
     unsafe {
