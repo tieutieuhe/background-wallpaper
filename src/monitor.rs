@@ -16,18 +16,37 @@ pub fn get_xlib() -> Option<&'static Xlib> {
     XLIB.get_or_init(|| Xlib::open().ok()).as_ref()
 }
 
+struct SafeDisplay(*mut xlib::Display);
+unsafe impl Send for SafeDisplay {}
+unsafe impl Sync for SafeDisplay {}
+
+static X_DISPLAY: OnceLock<Option<SafeDisplay>> = OnceLock::new();
+
+pub fn get_display(xlib: &Xlib) -> Option<*mut xlib::Display> {
+    X_DISPLAY.get_or_init(|| {
+        unsafe {
+            let disp = (xlib.XOpenDisplay)(ptr::null());
+            if disp.is_null() {
+                None
+            } else {
+                Some(SafeDisplay(disp))
+            }
+        }
+    }).as_ref().map(|sd| sd.0)
+}
+
 pub fn is_fullscreen_window_active() -> bool {
     let xlib = match get_xlib() {
         Some(x) => x,
         None => return false,
     };
 
-    unsafe {
-        let display = (xlib.XOpenDisplay)(ptr::null());
-        if display.is_null() {
-            return false;
-        }
+    let display = match get_display(xlib) {
+        Some(d) => d,
+        None => return false,
+    };
 
+    unsafe {
         let root = (xlib.XDefaultRootWindow)(display);
 
         let net_active_win = (xlib.XInternAtom)(
@@ -47,7 +66,6 @@ pub fn is_fullscreen_window_active() -> bool {
         );
 
         if net_active_win == 0 || net_wm_state == 0 || net_wm_state_fullscreen == 0 {
-            (xlib.XCloseDisplay)(display);
             return false;
         }
 
@@ -80,12 +98,10 @@ pub fn is_fullscreen_window_active() -> bool {
             if !prop.is_null() {
                 (xlib.XFree)(prop as *mut _);
             }
-            (xlib.XCloseDisplay)(display);
             return false;
         };
 
         if active_win == 0 || active_win == root {
-            (xlib.XCloseDisplay)(display);
             return false;
         }
 
@@ -119,7 +135,6 @@ pub fn is_fullscreen_window_active() -> bool {
             (xlib.XFree)(prop_state as *mut _);
         }
 
-        (xlib.XCloseDisplay)(display);
         is_fullscreen
     }
 }

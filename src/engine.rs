@@ -235,6 +235,7 @@ impl WallpaperEngine {
             "--hwdec=auto-safe".to_string(),
             "--vo=gpu".to_string(),
             "--gpu-context=auto".to_string(),
+            "--gpu-dumb-mode=yes".to_string(),
             "--opengl-swapinterval=0".to_string(),
             "--vulkan-swap-mode=immediate".to_string(),
             "--scale=bilinear".to_string(),
