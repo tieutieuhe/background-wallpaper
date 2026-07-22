@@ -1,0 +1,14 @@
+{
+  "displays": [
+    {
+      "name": "HDMI-1",
+      "geometry": "1920x1080+0+0",
+      "video_path": "/home/hvc/Videos/LiveWallpaper/bg.mp4"
+    },
+    {
+      "name": "DP-1",
+      "geometry": "1920x1080+1920+0",
+      "video_path": "/home/hvc/Videos/LiveWallpaper/bg.mp4"
+    }
+  ]
+}
