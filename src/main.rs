@@ -38,7 +38,17 @@ fn get_pid_file_path() -> PathBuf {
 }
 
 fn is_process_running(pid: u32) -> bool {
-    std::path::Path::new(&format!("/proc/{}", pid)).exists()
+    let comm_path = format!("/proc/{}/comm", pid);
+    if let Ok(comm) = std::fs::read_to_string(&comm_path) {
+        let comm = comm.trim();
+        let current_exe_name = std::env::current_exe()
+            .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string())
+            .unwrap_or_else(|_| "LiveWallpaper".to_string());
+
+        comm == current_exe_name || comm.to_lowercase().contains("livewallpaper")
+    } else {
+        false
+    }
 }
 
 fn kill_process_gracefully(pid: u32) -> bool {

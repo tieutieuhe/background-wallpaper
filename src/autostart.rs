@@ -27,7 +27,7 @@ pub fn set_autostart(enable: bool) -> Result<()> {
             Type=Application\n\
             Name=Live Wallpaper Engine\n\
             Comment=Tự động khởi chạy hình nền động khi đăng nhập\n\
-            Exec={} --daemon\n\
+            Exec=sh -c \"sleep 3 && {} --daemon\"\n\
             Terminal=false\n\
             Categories=Utility;Background;\n\
             X-GNOME-Autostart-enabled=true\n",

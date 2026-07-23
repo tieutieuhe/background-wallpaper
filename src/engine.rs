@@ -8,6 +8,8 @@ use std::thread;
 use std::time::Duration;
 use crate::monitor::get_xlib;
 use x11_dl::xlib;
+use std::io::Write;
+use std::os::unix::net::UnixStream;
 
 pub fn check_dependency(cmd: &str) -> bool {
     Command::new("which")
@@ -163,6 +165,8 @@ impl WallpaperEngine {
         if let Some(mut child) = self.active_processes.remove(name) {
             let _ = child.kill();
             let _ = child.wait();
+            let socket_path = format!("/tmp/livewallpaper-mpv-{}.sock", name);
+            let _ = std::fs::remove_file(socket_path);
             println!("[Engine] Đã dừng wallpaper cho màn hình [{}]", name);
         }
     }
@@ -179,26 +183,28 @@ impl WallpaperEngine {
         if self.is_auto_frozen || self.is_paused {
             return;
         }
-        for child in self.active_processes.values() {
-            let pid = child.id().to_string();
-            let _ = Command::new("kill").args(["-STOP", &pid]).status();
-            let _ = Command::new("pkill").args(["-P", &pid, "-STOP"]).status();
+        for display_name in self.active_processes.keys() {
+            let socket_path = format!("/tmp/livewallpaper-mpv-{}.sock", display_name);
+            if let Ok(mut stream) = UnixStream::connect(&socket_path) {
+                let _ = stream.write_all(b"{ \"command\": [\"set_property\", \"pause\", true] }\n");
+            }
         }
         self.is_auto_frozen = true;
-        println!("[Engine] Đã tự động đóng băng (SIGSTOP) wallpaper do ứng dụng Fullscreen.");
+        println!("[Engine] Đã tự động đóng băng (pause via IPC) wallpaper do ứng dụng Fullscreen.");
     }
 
     pub fn unfreeze_all(&mut self) {
         if !self.is_auto_frozen || self.is_paused {
             return;
         }
-        for child in self.active_processes.values() {
-            let pid = child.id().to_string();
-            let _ = Command::new("pkill").args(["-P", &pid, "-CONT"]).status();
-            let _ = Command::new("kill").args(["-CONT", &pid]).status();
+        for display_name in self.active_processes.keys() {
+            let socket_path = format!("/tmp/livewallpaper-mpv-{}.sock", display_name);
+            if let Ok(mut stream) = UnixStream::connect(&socket_path) {
+                let _ = stream.write_all(b"{ \"command\": [\"set_property\", \"pause\", false] }\n");
+            }
         }
         self.is_auto_frozen = false;
-        println!("[Engine] Đã tiếp tục phát (SIGCONT) wallpaper sau khi thoát Fullscreen.");
+        println!("[Engine] Đã tiếp tục phát (resume via IPC) wallpaper sau khi thoát Fullscreen.");
     }
 
     pub fn start_display(
@@ -247,6 +253,7 @@ impl WallpaperEngine {
             "--demuxer-max-bytes=10M".to_string(),
             "--demuxer-readahead-secs=2".to_string(),
             "--no-audio-display".to_string(),
+            format!("--input-ipc-server=/tmp/livewallpaper-mpv-{}.sock", display.name),
         ];
 
         if display.mute {
