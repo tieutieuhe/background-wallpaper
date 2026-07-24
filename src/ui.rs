@@ -2,11 +2,11 @@ use crate::autostart::{is_autostart_enabled, set_autostart};
 use crate::config::{AppConfig, DisplayConfig};
 use crate::engine::{check_dependencies, WallpaperEngine};
 use crate::monitor::{detect_monitors, is_fullscreen_window_active};
+use gtk::gio;
 use gtk::prelude::*;
 use gtk::{
-    Align, Application, ApplicationWindow, Box, Button, CheckButton, DropDown, FileChooserAction,
-    FileChooserDialog, FileFilter, HeaderBar, Label, Orientation, ResponseType, Scale,
-    ScrolledWindow, Switch,
+    Align, Application, ApplicationWindow, Box, Button, CheckButton, DropDown, FileDialog,
+    FileFilter, HeaderBar, Label, Orientation, Scale, ScrolledWindow, Switch,
 };
 
 
@@ -210,17 +210,6 @@ pub fn build_ui(app: &Application) {
                 let parent_win = window_clone.clone();
                 let file_label_cb = file_label.clone();
                 choose_btn.connect_clicked(move |_| {
-                    let dialog = FileChooserDialog::new(
-                        Some("Chọn Video làm Live Wallpaper"),
-                        Some(&parent_win),
-                        FileChooserAction::Open,
-                        &[
-                            ("_Hủy", ResponseType::Cancel),
-                            ("_Mở", ResponseType::Accept),
-                        ],
-                    );
-                    dialog.set_modal(true);
-
                     let filter = FileFilter::new();
                     filter.set_name(Some("Video Files (*.mp4, *.mkv, *.webm, *.mov, *.avi)"));
                     filter.add_mime_type("video/*");
@@ -230,16 +219,25 @@ pub fn build_ui(app: &Application) {
                     filter.add_pattern("*.mov");
                     filter.add_pattern("*.avi");
 
-                    dialog.add_filter(&filter);
+                    let filters = gio::ListStore::new::<FileFilter>();
+                    filters.append(&filter);
+
+                    let dialog = FileDialog::builder()
+                        .title("Chọn Video làm Live Wallpaper")
+                        .filters(&filters)
+                        .default_filter(&filter)
+                        .build();
 
                     let disp_name_dlg = disp_name_cb.clone();
                     let config_dlg = config_cb.clone();
                     let engine_dlg = engine_cb.clone();
                     let file_label_dlg = file_label_cb.clone();
 
-                    dialog.connect_response(move |dialog_res, response| {
-                        if response == ResponseType::Accept {
-                            if let Some(file) = dialog_res.file() {
+                    dialog.open(
+                        Some(&parent_win),
+                        gio::Cancellable::NONE,
+                        move |result| {
+                            if let Ok(file) = result {
                                 if let Some(path) = file.path() {
                                     let path_str = path.to_string_lossy().to_string();
                                     file_label_dlg.set_text(&path_str);
@@ -252,11 +250,8 @@ pub fn build_ui(app: &Application) {
                                     engine_dlg.borrow_mut().apply_config(&cfg);
                                 }
                             }
-                        }
-                        dialog_res.destroy();
-                    });
-
-                    dialog.show();
+                        },
+                    );
                 });
 
 
